@@ -25,7 +25,9 @@ public enum MinecraftAsset implements MinecraftResource {
     /** Minecraft Model Blocks */
     BLOCK_MODEL("model.block", "assets/minecraft/models/block", "json", BlockModelController.class),
 
-    BLOCK_STATE("blockstate.block", "assets/minecraft/blockstates", "json", BlockStateController.class);
+    BLOCK_STATE("blockstate.block", "assets/minecraft/blockstates", "json", BlockStateController.class),
+
+    BLOCK_TILESET("tileset.block",null,"png",null);
     
     /** The id of the asset type */
     private final String id;
@@ -87,6 +89,6 @@ public enum MinecraftAsset implements MinecraftResource {
      * @return all MinecraftAsset to load in the application
      */
     public static List<MinecraftAsset> getAll() {
-        return List.of(BLOCK_TEXTURE, BLOCK_TEXTURE_MCMETA, BLOCK_MODEL, BLOCK_STATE);
+        return List.of(BLOCK_TEXTURE, BLOCK_TEXTURE_MCMETA, BLOCK_MODEL, BLOCK_STATE, BLOCK_TILESET);
     }
 }

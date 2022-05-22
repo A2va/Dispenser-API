@@ -13,14 +13,27 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.FileOutputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+
+import java.awt.Graphics2D;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+
+import javax.imageio.ImageIO;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort.Direction;
 
 /**
  * An implementation of {@link AssetLoader} to load hashed assets in a database
@@ -79,6 +92,108 @@ public class AssetLoaderImpl implements AssetLoader {
             e.printStackTrace();
         }
         logger.debug("{} loaded in {} ms", infos.getId(), System.currentTimeMillis() - startingTime);
+        generateTileset(infos);
+    }
+
+    private void generateTileset(VersionInformation infos) { 
+
+        logger.debug("versions: "+infos.getId());
+        String[] sort = {"versionedAssets"}; 
+
+
+        var textures = repository.getAllAssets(MinecraftAsset.BLOCK_TEXTURE, infos.getId(), PageRequest.of(1, 20).withSort(Direction.ASC,sort));
+
+        final int numberofTextures = textures.getNumberOfElements();
+        if(numberofTextures <= 0) {
+            return;
+        }
+
+        final double initialWidth = Math.sqrt(numberofTextures);
+        final int width = upperPowerOfTwo((int)initialWidth);
+        final int pixelWidth = width * 16;
+        final double part = (double)1 / width;
+
+        // Create image
+        BufferedImage image = new BufferedImage(pixelWidth, pixelWidth, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics2D = image.createGraphics();
+
+
+        // Draw invalid texture
+        graphics2D.setPaint(Color.BLACK);
+        graphics2D.fillRect(0, 0, 16, 16);
+
+        graphics2D.setPaint(Color.MAGENTA);
+        graphics2D.fillRect(0,0,8,8);
+        graphics2D.fillRect(8,8,8,8);
+
+
+        int index = 1;
+        for (var texture : textures.getContent()) {
+            logger.debug(texture.toString());
+            BufferedImage read;
+            try { 
+                String fileHash = texture.getId();
+                String assetsId = texture.getAssetType().getId();
+                String extension = texture.getAssetType().getExtension();
+
+                read = ImageIO.read(new File(dataPath+File.separatorChar+assetsId+File.separatorChar+fileHash+"."+extension));
+
+
+                final int u  = (index % width);
+                final int v = (int)Math.floor(index/width);
+
+                index++;
+                // 
+                final int x = 16 * u;
+                final int y = 16 * v;
+
+                graphics2D.drawImage(read, x, y, x+16,y+16, 0, 0, 16, 16, null);
+
+            } catch(Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+
+        // Export image as byte array stream
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try{
+            ImageIO.write(image, "PNG", baos);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        // Add to db
+        try {
+            final String hash =  DigestUtils.md5Hex(baos.toByteArray());
+            if (repository.hashExists(MinecraftAsset.BLOCK_TILESET, hash))
+                repository.addToExistingHash(MinecraftAsset.BLOCK_TILESET, hash, infos.getId(), "tileset");
+            else {
+                repository.addNewAssetHash(MinecraftAsset.BLOCK_TILESET, infos.getId(), "tileset", hash);
+                String assetsId = MinecraftAsset.BLOCK_TILESET.getId();
+                String extension = MinecraftAsset.BLOCK_TILESET.getExtension();
+
+                String outPath = dataPath + File.separatorChar + assetsId + File.separatorChar + hash + "." + extension;
+                // Export image as file
+                try(OutputStream outputStream = new FileOutputStream(outPath)) {
+                    baos.writeTo(outputStream);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+    }
+
+    public static int upperPowerOfTwo(int number) {
+        number--;
+        number |= number >>> 1;
+        number |= number >>> 2;
+        number |= number >>> 4;
+        number |= number >>> 8;
+        number |= number >>> 16;
+        number++;
+        return number;
     }
 
     /**
@@ -90,6 +205,9 @@ public class AssetLoaderImpl implements AssetLoader {
     private void addAllToDb(VersionInformation version, MinecraftAsset... assetTypes) throws IOException {
         logger.debug("Loading data in database");
         for (var asset : assetTypes) {
+            if(asset.equals(MinecraftAsset.BLOCK_TILESET)) {
+                continue;
+            }
             final var oldPath = tmpPath + File.separatorChar + asset.getId();
             final var newPath = dataPath + File.separatorChar + asset.getId();
             Files.createDirectories(Path.of(newPath));
@@ -121,7 +239,7 @@ public class AssetLoaderImpl implements AssetLoader {
                 repository.addToExistingHash(assetType, hash, version, nameSplit[0]);
             else {
                 repository.addNewAssetHash(assetType, version, nameSplit[0], hash);
-                Files.move(file.toPath(), Path.of(newPath + File.separatorChar + hash + "." + nameSplit[1]));
+                Files.move(file.toPath(), Path.of(newPath + File.separatorChar + hash + "." + nameSplit[1]), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -155,6 +273,10 @@ public class AssetLoaderImpl implements AssetLoader {
     private void extractAll(File file, MinecraftAsset... assets) throws IOException {
         try (final ZipFile archive = new ZipFile(file)) {
             for (var asset : assets) {
+                if(asset.equals(MinecraftAsset.BLOCK_TILESET)) {
+                    continue;
+                }
+
                 if (logger.isDebugEnabled())
                     logger.debug("Extracting {} from {}", asset.getPathInJar() + "/*." + asset.getExtension(), file.getName());
 
