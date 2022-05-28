@@ -89,6 +89,7 @@ public enum MinecraftAsset implements MinecraftResource {
      * @return all MinecraftAsset to load in the application
      */
     public static List<MinecraftAsset> getAll() {
-        return List.of(BLOCK_TEXTURE, BLOCK_TEXTURE_MCMETA, BLOCK_MODEL, BLOCK_STATE, BLOCK_TILESET);
+        // Note: BLOCK_TILESET is not in this list because it's not an assets that's inside the jar.
+        return List.of(BLOCK_TEXTURE, BLOCK_TEXTURE_MCMETA, BLOCK_MODEL, BLOCK_STATE);
     }
 }

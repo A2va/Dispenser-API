@@ -205,9 +205,6 @@ public class AssetLoaderImpl implements AssetLoader {
     private void addAllToDb(VersionInformation version, MinecraftAsset... assetTypes) throws IOException {
         logger.debug("Loading data in database");
         for (var asset : assetTypes) {
-            if(asset.equals(MinecraftAsset.BLOCK_TILESET)) {
-                continue;
-            }
             final var oldPath = tmpPath + File.separatorChar + asset.getId();
             final var newPath = dataPath + File.separatorChar + asset.getId();
             Files.createDirectories(Path.of(newPath));
@@ -273,10 +270,6 @@ public class AssetLoaderImpl implements AssetLoader {
     private void extractAll(File file, MinecraftAsset... assets) throws IOException {
         try (final ZipFile archive = new ZipFile(file)) {
             for (var asset : assets) {
-                if(asset.equals(MinecraftAsset.BLOCK_TILESET)) {
-                    continue;
-                }
-
                 if (logger.isDebugEnabled())
                     logger.debug("Extracting {} from {}", asset.getPathInJar() + "/*." + asset.getExtension(), file.getName());
 
