@@ -19,7 +19,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.FileOutputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +35,7 @@ import javax.imageio.ImageIO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort.Direction;
+import org.apache.commons.io.FileUtils;
 
 /**
  * An implementation of {@link AssetLoader} to load hashed assets in a database
@@ -186,7 +186,8 @@ public class AssetLoaderImpl implements AssetLoader {
 
                 String outPath = dataPath + File.separatorChar + assetsId + File.separatorChar + hash + "." + extension;
                 // Export image as file
-                try(OutputStream fileOutputStream = new FileOutputStream(outPath)) {
+                File file = new File(outPath);
+                try(OutputStream fileOutputStream = FileUtils.openOutputStream(file)) {
                     outputStream.writeTo(fileOutputStream);
                 }
             }
