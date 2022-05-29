@@ -4,6 +4,7 @@ import fr.theogiraudet.dispenser_api.web.rest.BlockMcMetaController;
 import fr.theogiraudet.dispenser_api.web.rest.BlockModelController;
 import fr.theogiraudet.dispenser_api.web.rest.BlockTextureController;
 import fr.theogiraudet.dispenser_api.web.rest.BlockStateController;
+import fr.theogiraudet.dispenser_api.web.rest.BlockTilesetController;
 import fr.theogiraudet.dispenser_api.web.rest.abstract_resources.AssetController;
 
 import java.util.List;
@@ -27,7 +28,7 @@ public enum MinecraftAsset implements MinecraftResource {
 
     BLOCK_STATE("blockstate.block", "assets/minecraft/blockstates", "json", BlockStateController.class),
 
-    BLOCK_TILESET("tileset.block",null,"png",null);
+    BLOCK_TILESET("tileset.block",null,"png",BlockTilesetController.class);
     
     /** The id of the asset type */
     private final String id;

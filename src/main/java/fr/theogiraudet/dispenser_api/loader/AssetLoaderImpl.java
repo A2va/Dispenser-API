@@ -117,7 +117,6 @@ public class AssetLoaderImpl implements AssetLoader {
         final double initialWidth = Math.sqrt(numberofTextures);
         final int width = upperPowerOfTwo((int)initialWidth);
         final int pixelWidth = width * 16;
-        final double part = (double)1 / width;
 
         // Create image
         BufferedImage image = new BufferedImage(pixelWidth, pixelWidth, BufferedImage.TYPE_INT_ARGB);
@@ -132,6 +131,8 @@ public class AssetLoaderImpl implements AssetLoader {
         graphics2D.fillRect(0,0,8,8);
         graphics2D.fillRect(8,8,8,8);
 
+
+        TilesetBlockPosition.addVersion(infos.getId());
 
         // Start at index one because invalid texture is already on image
         int index = 1;
@@ -150,6 +151,11 @@ public class AssetLoaderImpl implements AssetLoader {
                 final int v = (int)Math.floor(index/width);
                 final int x = 16 * u;
                 final int y = 16 * v;
+
+                // Save block position
+                int[] position = {x,y,x+16,y+16};
+                String blockName = (String) texture.getVersionedAssets().keySet().toArray()[0];
+                TilesetBlockPosition.addPosition(infos.getId(), blockName, position);
 
                 // Draw texture
                 graphics2D.drawImage(input, x, y, x+16,y+16, 0, 0, 16, 16, null);
@@ -187,8 +193,6 @@ public class AssetLoaderImpl implements AssetLoader {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-
     }
 
     /**
