@@ -2,6 +2,7 @@ package fr.theogiraudet.dispenser_api.loader;
 
 import fr.theogiraudet.dispenser_api.dao.MinecraftResourceRepository;
 import fr.theogiraudet.dispenser_api.dao.MinecraftVersionRepository;
+import fr.theogiraudet.dispenser_api.domain.HashedAsset;
 import fr.theogiraudet.dispenser_api.domain.MinecraftAsset;
 import fr.theogiraudet.dispenser_api.domain.VersionInformation;
 import net.lingala.zip4j.ZipFile;
@@ -32,6 +33,7 @@ import java.awt.image.BufferedImage;
 
 import javax.imageio.ImageIO;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort.Direction;
 
@@ -91,23 +93,27 @@ public class AssetLoaderImpl implements AssetLoader {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        logger.debug("{} loaded in {} ms", infos.getId(), System.currentTimeMillis() - startingTime);
         generateTileset(infos);
+        logger.debug("{} loaded in {} ms", infos.getId(), System.currentTimeMillis() - startingTime);
     }
 
+    /**
+     * Generate tileset assets from specified version
+     * @param infos the {@link VersionInformation} from which to extract the assets
+     */
     private void generateTileset(VersionInformation infos) { 
-
-        logger.debug("versions: "+infos.getId());
+        logger.debug("Generating the tileset..");
         String[] sort = {"versionedAssets"}; 
 
 
-        var textures = repository.getAllAssets(MinecraftAsset.BLOCK_TEXTURE, infos.getId(), PageRequest.of(1, 20).withSort(Direction.ASC,sort));
-
+        // Get all textures
+        Page<HashedAsset> textures = repository.getAllAssets(MinecraftAsset.BLOCK_TEXTURE, infos.getId(), PageRequest.of(1, 20).withSort(Direction.ASC,sort));
         final int numberofTextures = textures.getNumberOfElements();
-        if(numberofTextures <= 0) {
+        if(textures.getNumberOfElements() <= 0) {
             return;
         }
 
+        // Compute image value
         final double initialWidth = Math.sqrt(numberofTextures);
         final int width = upperPowerOfTwo((int)initialWidth);
         final int pixelWidth = width * 16;
@@ -127,27 +133,27 @@ public class AssetLoaderImpl implements AssetLoader {
         graphics2D.fillRect(8,8,8,8);
 
 
+        // Start at index one because invalid texture is already on image
         int index = 1;
         for (var texture : textures.getContent()) {
-            logger.debug(texture.toString());
-            BufferedImage read;
+            BufferedImage input;
             try { 
+
+                // Get the file path and read the texture
                 String fileHash = texture.getId();
                 String assetsId = texture.getAssetType().getId();
                 String extension = texture.getAssetType().getExtension();
+                input = ImageIO.read(new File(dataPath+File.separatorChar+assetsId+File.separatorChar+fileHash+"."+extension));
 
-                read = ImageIO.read(new File(dataPath+File.separatorChar+assetsId+File.separatorChar+fileHash+"."+extension));
-
-
+                // Compute position value
                 final int u  = (index % width);
                 final int v = (int)Math.floor(index/width);
-
-                index++;
-                // 
                 final int x = 16 * u;
                 final int y = 16 * v;
 
-                graphics2D.drawImage(read, x, y, x+16,y+16, 0, 0, 16, 16, null);
+                // Draw texture
+                graphics2D.drawImage(input, x, y, x+16,y+16, 0, 0, 16, 16, null);
+                index++;
 
             } catch(Exception ex) {
                 ex.printStackTrace();
@@ -155,16 +161,16 @@ public class AssetLoaderImpl implements AssetLoader {
         }
 
         // Export image as byte array stream
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         try{
-            ImageIO.write(image, "PNG", baos);
+            ImageIO.write(image, "PNG", outputStream);
         } catch(Exception e) {
             e.printStackTrace();
         }
 
         // Add to db
         try {
-            final String hash =  DigestUtils.md5Hex(baos.toByteArray());
+            final String hash =  DigestUtils.md5Hex(outputStream.toByteArray());
             if (repository.hashExists(MinecraftAsset.BLOCK_TILESET, hash))
                 repository.addToExistingHash(MinecraftAsset.BLOCK_TILESET, hash, infos.getId(), "tileset");
             else {
@@ -174,8 +180,8 @@ public class AssetLoaderImpl implements AssetLoader {
 
                 String outPath = dataPath + File.separatorChar + assetsId + File.separatorChar + hash + "." + extension;
                 // Export image as file
-                try(OutputStream outputStream = new FileOutputStream(outPath)) {
-                    baos.writeTo(outputStream);
+                try(OutputStream fileOutputStream = new FileOutputStream(outPath)) {
+                    outputStream.writeTo(fileOutputStream);
                 }
             }
         } catch (IOException e) {
@@ -185,6 +191,11 @@ public class AssetLoaderImpl implements AssetLoader {
 
     }
 
+    /**
+     * Compute the upper power of two 
+     * @param number a number
+     * @return upper power of two
+     */
     public static int upperPowerOfTwo(int number) {
         number--;
         number |= number >>> 1;
